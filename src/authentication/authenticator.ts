@@ -5,6 +5,13 @@ import { TokenStorage, IToken, ICode, IError } from './token.manager';
 import { Dialog } from '../helpers/dialog';
 import { CustomError } from '../errors/custom.error';
 
+interface AuthOptions {
+  readonly force?: boolean;
+  readonly useMicrosoftTeams?: boolean;
+  readonly width?: number;
+  readonly height?: number;
+}
+
 /**
  * Custom error type to handle OAuth specific errors.
  */
@@ -57,17 +64,18 @@ export class Authenticator {
    */
   authenticate(
     provider: string,
-    force: boolean = false,
-    useMicrosoftTeams: boolean = false
+    options?: AuthOptions
   ): Promise<IToken> {
     let token = this.tokens.get(provider);
     let hasTokenExpired = TokenStorage.hasExpired(token);
 
-    if (!hasTokenExpired && !force) {
+    const forceReAuth = options ? options.force : false;
+
+    if (!hasTokenExpired && !forceReAuth) {
       return Promise.resolve(token);
     }
 
-    return this._openAuthDialog(provider, useMicrosoftTeams);
+    return this._openAuthDialog(provider, options);
   }
 
   /**
@@ -136,7 +144,7 @@ export class Authenticator {
     return params;
   }
 
-  private async _openAuthDialog(provider: string, useMicrosoftTeams: boolean): Promise<IToken> {
+  private async _openAuthDialog(provider: string, options?: AuthOptions): Promise<IToken> {
     // Get the endpoint configuration for the given provider and verify that it exists.
     let endpoint = this.endpoints.get(provider);
     if (endpoint == null) {
@@ -148,7 +156,11 @@ export class Authenticator {
 
     // Launch the dialog and perform the OAuth flow. We launch the dialog at the redirect
     // url where we expect the call to isAuthDialog to be available.
-    let redirectUrl = await new Dialog<string>(url, 1024, 768, useMicrosoftTeams).result;
+    const dialogWidth = options && options.width || 1024;
+    const dialogHeight = options && options.height || 1024;
+    const dialogUsingTeams = (options && options.useMicrosoftTeams) || false;
+
+    let redirectUrl = await new Dialog<string>(url, dialogWidth, dialogHeight, dialogUsingTeams).result;
 
     // Try and extract the result and pass it along.
     return this._handleTokenResult(redirectUrl, endpoint, state);
