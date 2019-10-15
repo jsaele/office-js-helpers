@@ -149,11 +149,21 @@ export class Dialog<T> {
   private _edgeDialog(): Promise<T> {
     return new Promise((resolve, reject) => {
       Office.context.ui.displayDialogAsync(this.url, { width: this.size.width$, height: this.size.height$ }, (result: Office.AsyncResult) => {
+        let dialog = result.value as Office.DialogHandler;
+
         if (result.status === Office.AsyncResultStatus.Failed) {
           reject(new DialogError(result.error.message, result.error));
         }
         else {
-          this._pollLocalStorageForToken(resolve, reject);
+          const onToken = token => {
+            if (dialog) {
+              dialog.close();
+            }
+
+            return resolve(token);
+          };
+
+          this._pollLocalStorageForToken(onToken, reject);
         }
       });
     });
